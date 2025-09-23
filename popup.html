@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Recorder</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 360px;
+        min-height: 500px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: #f8fafc;
+        color: #1f2937;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .header p {
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .content {
+        padding: 20px;
+      }
+
+      .auth-section {
+        text-align: center;
+      }
+
+      .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .input-group label {
+        font-size: 12px;
+        font-weight: 500;
+        color: #6b7280;
+      }
+
+      .input-group input {
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: all 0.2s;
+      }
+
+      .input-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .btn {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: #5a6fd8;
+        transform: translateY(-1px);
+      }
+
+      .btn-success {
+        background: #10b981;
+        color: white;
+      }
+
+      .btn-success:hover:not(:disabled) {
+        background: #059669;
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover:not(:disabled) {
+        background: #dc2626;
+      }
+
+      .btn-secondary {
+        background: #6b7280;
+        color: white;
+      }
+
+      .btn-secondary:hover:not(:disabled) {
+        background: #4b5563;
+      }
+
+      .recording-section {
+        text-align: center;
+      }
+
+      .recording-options {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .recording-options h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #374151;
+      }
+
+      .option-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .checkbox-group input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+      }
+
+      .recording-status {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      .recording-timer {
+        font-size: 18px;
+        font-weight: 600;
+        color: #ef4444;
+        margin: 8px 0;
+      }
+
+      .recent-recordings {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .recent-recordings h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #374151;
+      }
+
+      .recording-item {
+        padding: 8px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 12px;
+      }
+
+      .recording-item:last-child {
+        border-bottom: none;
+      }
+
+      .recording-title {
+        font-weight: 500;
+        margin-bottom: 2px;
+      }
+
+      .recording-meta {
+        color: #6b7280;
+        font-size: 11px;
+      }
+
+      .error-message {
+        background: #fef2f2;
+        color: #dc2626;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-bottom: 12px;
+        border: 1px solid #fecaca;
+      }
+
+      .success-message {
+        background: #f0fdf4;
+        color: #16a34a;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-bottom: 12px;
+        border: 1px solid #bbf7d0;
+      }
+
+      .loading {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #f3f4f6;
+        border-top: 2px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .nav-tabs {
+        display: flex;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 16px;
+      }
+
+      .nav-tab {
+        flex: 1;
+        padding: 8px 12px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        color: #6b7280;
+        transition: all 0.2s;
+      }
+
+      .nav-tab.active {
+        color: #667eea;
+        border-bottom: 2px solid #667eea;
+      }
+
+      .tab-content {
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      .user-info {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: white;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #667eea;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .user-details {
+        flex: 1;
+        margin-left: 12px;
+      }
+
+      .user-name {
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .user-email {
+        font-size: 11px;
+        color: #6b7280;
+      }
+
+      .logout-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+        background: #f3f4f6;
+        color: #374151;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Meeting Recorder</h1>
+      <p>Record and save your meetings securely</p>
+    </div>
+
+    <div class="content">
+      <!-- Authentication Section -->
+      <div id="auth-section" class="auth-section">
+        <h3>Please sign in to continue</h3>
+        <form id="login-form" class="login-form">
+          <div class="input-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" required />
+          </div>
+          <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" required />
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <span id="login-text">Sign In</span>
+            <div id="login-spinner" class="spinner" style="display: none"></div>
+          </button>
+        </form>
+        <div id="auth-error" class="error-message" style="display: none"></div>
+      </div>
+
+      <!-- Main Application -->
+      <div id="app-section" style="display: none">
+        <!-- User Info -->
+        <div id="user-info" class="user-info">
+          <div class="user-avatar" id="user-avatar">U</div>
+          <div class="user-details">
+            <div class="user-name" id="user-name">Loading...</div>
+            <div class="user-email" id="user-email">Loading...</div>
+          </div>
+          <button class="logout-btn" id="logout-btn">Logout</button>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+          <button class="nav-tab active" data-tab="record">Record</button>
+          <button class="nav-tab" data-tab="recordings">Recordings</button>
+          <button class="nav-tab" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- Record Tab -->
+        <div id="record-tab" class="tab-content active">
+          <div id="recording-setup">
+            <div class="recording-options">
+              <h3>Recording Options</h3>
+              <div class="option-group">
+                <div class="checkbox-group">
+                  <input type="checkbox" id="include-screen" checked />
+                  <label for="include-screen">Record screen</label>
+                </div>
+                <div class="checkbox-group">
+                  <input type="checkbox" id="include-audio" checked />
+                  <label for="include-audio">Record microphone</label>
+                </div>
+                <div class="checkbox-group">
+                  <input type="checkbox" id="include-system-audio" />
+                  <label for="include-system-audio">Record system audio</label>
+                </div>
+              </div>
+            </div>
+
+            <button
+              id="start-recording"
+              class="btn btn-success"
+              style="width: 100%"
+            >
+              🎥 Start Recording
+            </button>
+          </div>
+
+          <div id="recording-active" style="display: none">
+            <div class="recording-status">
+              <div class="status-indicator">
+                <span class="status-dot"></span>
+                Recording in progress
+              </div>
+              <div class="recording-timer" id="recording-timer">00:00</div>
+            </div>
+
+            <button
+              id="stop-recording"
+              class="btn btn-danger"
+              style="width: 100%"
+            >
+              ⏹️ Stop Recording
+            </button>
+          </div>
+
+          <div id="recording-message" style="display: none"></div>
+        </div>
+
+        <!-- Recordings Tab -->
+        <div id="recordings-tab" class="tab-content">
+          <div class="recent-recordings">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+              "
+            >
+              <h3>Recent Recordings</h3>
+              <button
+                id="sync-recordings"
+                class="btn btn-secondary"
+                style="padding: 4px 8px; font-size: 11px"
+              >
+                🔄 Sync
+              </button>
+            </div>
+            <div id="recordings-list">
+              <div
+                style="
+                  text-align: center;
+                  color: #6b7280;
+                  font-size: 12px;
+                  padding: 20px;
+                "
+              >
+                Loading recordings...
+              </div>
+            </div>
+          </div>
+
+          <button
+            id="open-dashboard"
+            class="btn btn-secondary"
+            style="width: 100%; margin-top: 12px"
+          >
+            📊 Open Dashboard
+          </button>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+          <div class="recording-options">
+            <h3>Recording Settings</h3>
+            <div class="option-group">
+              <div class="input-group">
+                <label for="audio-quality">Audio Quality</label>
+                <select
+                  id="audio-quality"
+                  style="
+                    padding: 8px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 6px;
+                  "
+                >
+                  <option value="low">Low (64kbps)</option>
+                  <option value="medium" selected>Medium (128kbps)</option>
+                  <option value="high">High (192kbps)</option>
+                </select>
+              </div>
+              <div class="input-group" style="margin-top: 12px">
+                <label for="video-quality">Video Quality</label>
+                <select
+                  id="video-quality"
+                  style="
+                    padding: 8px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 6px;
+                  "
+                >
+                  <option value="low">Low (480p)</option>
+                  <option value="medium" selected>Medium (720p)</option>
+                  <option value="high">High (1080p)</option>
+                </select>
+              </div>
+              <div class="checkbox-group" style="margin-top: 12px">
+                <input type="checkbox" id="auto-upload" checked />
+                <label for="auto-upload">Auto-upload recordings</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
