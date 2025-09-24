@@ -1,5 +1,3 @@
-// content.js - Content Script for Meeting Detection and Context
-
 class MeetingDetector {
     constructor() {
         this.meetingPlatforms = {
@@ -229,13 +227,11 @@ class MeetingDetector {
     }
 
     injectRecordingIndicator() {
-        // Remove existing indicator if any
         const existingIndicator = document.getElementById('meeting-recorder-indicator');
         if (existingIndicator) {
             existingIndicator.remove();
         }
 
-        // Create recording indicator element
         const indicator = document.createElement('div');
         indicator.id = 'meeting-recorder-indicator';
         indicator.innerHTML = `
@@ -265,7 +261,6 @@ class MeetingDetector {
             pointer-events: none !important;
         `;
 
-        // Add CSS for pulsing animation
         const style = document.createElement('style');
         style.textContent = `
             #meeting-recorder-indicator .pulse-dot {
@@ -314,13 +309,11 @@ class MeetingDetector {
             console.log('Showing recording indicator');
             indicator.style.display = 'flex';
 
-            // Add a slight delay and force a repaint
             setTimeout(() => {
                 indicator.style.opacity = '1';
                 indicator.style.transform = 'translateY(0)';
             }, 100);
 
-            // Also update the page title to indicate recording
             if (!document.title.includes('🔴')) {
                 document.title = '🔴 ' + document.title;
             }
@@ -328,7 +321,6 @@ class MeetingDetector {
             console.log('Hiding recording indicator');
             indicator.style.display = 'none';
 
-            // Remove recording indicator from title
             if (document.title.includes('🔴 ')) {
                 document.title = document.title.replace('🔴 ', '');
             }
@@ -336,6 +328,5 @@ class MeetingDetector {
     }
 }
 
-// Initialize meeting detector
 console.log('Initializing meeting detector...');
 const meetingDetector = new MeetingDetector();

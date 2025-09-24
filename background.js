@@ -1,4 +1,3 @@
-// background.js - Fixed version with proper message routing and recording indicators
 const API_BASE_URL = 'http://localhost:3000/api';
 
 class RecordingManager {
@@ -18,21 +17,17 @@ class RecordingManager {
 
             console.log('RecordingManager: Starting recording with options:', options);
 
-            // Ensure offscreen document exists and is ready
             await this.ensureOffscreenDocument();
 
             this.isRecording = true;
             this.startTime = new Date();
             this.recordingData = [];
 
-            // Update extension badge
             chrome.action.setBadgeText({ text: 'REC' });
             chrome.action.setBadgeBackgroundColor({ color: '#ff0000' });
 
-            // Notify all tabs about recording status FIRST
             await this.notifyTabsRecordingStatus(true);
 
-            // Start recording through offscreen document
             const message = {
                 target: 'offscreen',
                 action: 'startCapture',
@@ -44,8 +39,6 @@ class RecordingManager {
                     audioQuality: options.audioQuality || 'medium'
                 }
             };
-
-            // Broadcast message to offscreen document
             this.sendToOffscreen(message);
 
             console.log('RecordingManager: Recording started successfully');
@@ -55,7 +48,6 @@ class RecordingManager {
             console.error('Failed to start recording:', error);
             this.isRecording = false;
             chrome.action.setBadgeText({ text: '' });
-            // Make sure to hide indicators on error
             await this.notifyTabsRecordingStatus(false);
             return { success: false, error: error.message };
         }
@@ -69,7 +61,6 @@ class RecordingManager {
 
             console.log('RecordingManager: Stopping recording');
 
-            // Send stop message to offscreen document
             this.sendToOffscreen({
                 target: 'offscreen',
                 action: 'stopCapture'
@@ -77,13 +68,9 @@ class RecordingManager {
 
             this.isRecording = false;
 
-            // Clear badge
             chrome.action.setBadgeText({ text: '' });
 
-            // Notify all tabs about recording status
             await this.notifyTabsRecordingStatus(false);
-
-            console.log('RecordingManager: Recording stopped successfully');
             return { success: true, message: 'Recording stopped' };
 
         } catch (error) {
@@ -91,23 +78,17 @@ class RecordingManager {
             return { success: false, error: error.message };
         }
     }
-
-    // Add method to notify all tabs about recording status
     async notifyTabsRecordingStatus(isRecording) {
         try {
-            console.log(`RecordingManager: Notifying all tabs - recording: ${isRecording}`);
             const tabs = await chrome.tabs.query({});
 
             for (const tab of tabs) {
                 try {
-                    // Send message to content script
                     await chrome.tabs.sendMessage(tab.id, {
                         action: 'updateRecordingStatus',
                         isRecording: isRecording
                     });
-                    console.log(`RecordingManager: Notified tab ${tab.id}`);
                 } catch (error) {
-                    // Ignore errors for tabs that don't have the content script
                     console.log(`Could not notify tab ${tab.id}:`, error.message);
                 }
             }
@@ -117,7 +98,6 @@ class RecordingManager {
     }
 
     sendToOffscreen(message) {
-        // Use chrome.runtime.sendMessage with a target identifier
         chrome.runtime.sendMessage(message).catch(error => {
             console.error('Failed to send message to offscreen:', error);
         });
@@ -136,7 +116,6 @@ class RecordingManager {
                     justification: 'Recording meeting audio and video'
                 });
 
-                // Wait for offscreen document to initialize
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
             } catch (error) {
@@ -154,14 +133,11 @@ class RecordingManager {
             const endTime = new Date();
             const duration = Math.round((endTime - this.startTime) / 1000);
 
-            // Convert base64 to blob
             const recordingBlob = await fetch(recordingData.blob).then(r => r.blob());
 
-            // Get current tab info for context
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             const currentTab = tabs[0];
 
-            // Prepare metadata
             const metadata = {
                 title: currentTab?.title || 'Untitled Meeting',
                 url: currentTab?.url || '',
@@ -172,16 +148,11 @@ class RecordingManager {
                 mimeType: recordingData.mimeType
             };
 
-            console.log('RecordingManager: Recording metadata:', metadata);
-
-            // Upload to backend
             const uploadResult = await this.uploadRecording(recordingBlob, metadata);
 
             if (uploadResult.success) {
-                // Store in local storage for offline access
                 await this.storeRecordingMetadata(uploadResult.data);
 
-                // Notify user of successful upload
                 chrome.notifications.create({
                     type: 'basic',
                     iconUrl: 'icons/icon48.png',
@@ -189,7 +160,6 @@ class RecordingManager {
                     message: `Meeting recording uploaded successfully (${this.formatFileSize(recordingData.size)})`
                 });
             } else {
-                // Store locally if upload fails
                 await this.storeRecordingLocally(recordingBlob, metadata);
 
                 chrome.notifications.create({
@@ -213,13 +183,11 @@ class RecordingManager {
 
     async uploadRecording(blob, metadata) {
         try {
-            // Get auth token
             const authData = await chrome.storage.local.get(['authToken']);
             if (!authData.authToken) {
                 throw new Error('User not authenticated');
             }
 
-            // Create form data
             const formData = new FormData();
             formData.append('recording', blob, `meeting-${Date.now()}.webm`);
             formData.append('metadata', JSON.stringify(metadata));
@@ -294,14 +262,10 @@ class RecordingManager {
     }
 }
 
-// Initialize recording manager
 const recordingManager = new RecordingManager();
 
-// Handle messages from popup and offscreen document
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('Background received message:', request.action, 'from:', sender.tab ? 'tab' : 'extension');
 
-    // Handle messages from offscreen document (these have no target)
     if (!request.target) {
         switch (request.action) {
             case 'captureStarted':
@@ -313,7 +277,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 console.error('Capture error from offscreen:', request.error);
                 recordingManager.isRecording = false;
                 chrome.action.setBadgeText({ text: '' });
-                // Notify tabs to hide recording indicators
                 recordingManager.notifyTabsRecordingStatus(false);
                 chrome.notifications.create({
                     type: 'basic',
@@ -344,7 +307,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
     }
 
-    // Handle messages from popup - FIXED: Accept both with and without target
     if (request.target === 'background' || (!request.target && request.action)) {
         switch (request.action) {
             case 'startRecording':
@@ -358,7 +320,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         console.error('Start recording error:', error);
                         sendResponse({ success: false, error: error.message });
                     });
-                return true; // Async response
+                return true;
 
             case 'stopRecording':
                 console.log('Background: Handling stopRecording request');
@@ -371,7 +333,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         console.error('Stop recording error:', error);
                         sendResponse({ success: false, error: error.message });
                     });
-                return true; // Async response
+                return true;
 
             case 'getRecordingStatus':
                 const status = {
@@ -386,7 +348,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 syncPendingRecordings()
                     .then(result => sendResponse(result))
                     .catch(error => sendResponse({ success: false, error: error.message }));
-                return true; // Async response
+                return true;
 
             case 'logout':
                 chrome.storage.local.remove(['authToken']);
@@ -402,7 +364,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-// Sync pending local recordings when connection is restored
 async function syncPendingRecordings() {
     try {
         const { localRecordings = [] } = await chrome.storage.local.get(['localRecordings']);
@@ -449,11 +410,9 @@ async function syncPendingRecordings() {
     }
 }
 
-// Handle extension installation
 chrome.runtime.onInstalled.addListener(async () => {
     console.log('Meeting Recorder Extension installed');
 
-    // Initialize storage
     chrome.storage.local.set({
         recordings: [],
         localRecordings: [],
