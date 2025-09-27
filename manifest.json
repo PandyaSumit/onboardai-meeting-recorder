@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Meeting Recorder Pro",
   "version": "1.0.0",
-  "description": "Record meetings with audio and screen capture, store securely in the cloud",
+  "description": "Professional meeting recorder with on-screen controls and cloud storage",
 
   "permissions": [
     "activeTab",
@@ -11,27 +11,29 @@
     "desktopCapture",
     "tabCapture",
     "offscreen",
-    "notifications"
+    "notifications",
+    "scripting"
   ],
 
-  "host_permissions": ["*://localhost:*/*", "*://your-api-domain.com/*"],
+  "host_permissions": ["*://localhost:*/*", "*://api.meetingrecorder.com/*"],
 
   "background": {
-    "service_worker": "background.js",
+    "service_worker": "background/service-worker.js",
     "type": "module"
   },
 
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
+      "js": ["content/content-script.js"],
+      "css": ["ui/recorder-widget.css"],
+      "run_at": "document_end"
     }
   ],
 
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "Meeting Recorder",
+    "default_popup": "ui/popup.html",
+    "default_title": "Meeting Recorder Pro",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -49,7 +51,12 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["offscreen.html", "dashboard.html"],
+      "resources": [
+        "ui/offscreen.html",
+        "ui/dashboard.html",
+        "ui/recorder-widget.css",
+        "assets/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

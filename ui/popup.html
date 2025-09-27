@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Recorder Pro</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 380px;
+        min-height: 500px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #1f2937;
+        overflow-x: hidden;
+      }
+
+      .container {
+        background: white;
+        min-height: 500px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .header p {
+        font-size: 13px;
+        opacity: 0.9;
+      }
+
+      .content {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .status-card {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+      }
+
+      .status-dot.recording {
+        background: #ef4444;
+        animation: pulse 1.5s infinite;
+      }
+
+      .status-dot.paused {
+        background: #f59e0b;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .recording-time {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1f2937;
+        font-family: "SF Mono", monospace;
+      }
+
+      .quick-actions {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .action-btn {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background: #10b981;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #059669;
+      }
+
+      .btn-secondary {
+        background: #6b7280;
+        color: white;
+      }
+
+      .btn-secondary:hover {
+        background: #4b5563;
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+
+      .settings-section {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+
+      .settings-section h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #374151;
+      }
+
+      .setting-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .setting-item input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #667eea;
+      }
+
+      .recent-section {
+        flex: 1;
+      }
+
+      .recent-section h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #374151;
+      }
+
+      .recording-item {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        font-size: 12px;
+      }
+
+      .recording-title {
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .recording-meta {
+        color: #6b7280;
+        display: flex;
+        gap: 12px;
+        font-size: 11px;
+      }
+
+      .empty-state {
+        text-align: center;
+        color: #6b7280;
+        font-size: 13px;
+        padding: 20px 0;
+      }
+
+      .footer {
+        padding: 16px 20px;
+        border-top: 1px solid #e5e7eb;
+        background: #f8fafc;
+      }
+
+      .footer-btn {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #d1d5db;
+        background: white;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .footer-btn:hover {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+      }
+
+      .loading {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #6b7280;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #f3f4f6;
+        border-top: 2px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error {
+        background: #fef2f2;
+        color: #dc2626;
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-bottom: 12px;
+        border: 1px solid #fecaca;
+      }
+
+      .success {
+        background: #f0fdf4;
+        color: #16a34a;
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-bottom: 12px;
+        border: 1px solid #bbf7d0;
+      }
+
+      .widget-info {
+        background: #eff6ff;
+        color: #1e40af;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        margin-bottom: 16px;
+        border: 1px solid #dbeafe;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Meeting Recorder Pro</h1>
+        <p>Professional meeting recording with on-screen controls</p>
+      </div>
+
+      <div class="content">
+        <div class="widget-info">
+          <strong>On-Screen Widget Active:</strong> Look for the floating
+          recorder widget on your screen to start recording!
+        </div>
+
+        <div id="message-container"></div>
+
+        <div class="status-card">
+          <div class="status-indicator">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Ready to Record</span>
+          </div>
+          <div class="recording-time" id="recording-time">00:00</div>
+        </div>
+
+        <div class="quick-actions">
+          <button class="action-btn btn-primary" id="start-btn">
+            <span>🎥</span> Start
+          </button>
+          <button
+            class="action-btn btn-secondary"
+            id="pause-btn"
+            style="display: none"
+          >
+            <span>⏸️</span> Pause
+          </button>
+          <button
+            class="action-btn btn-primary"
+            id="resume-btn"
+            style="display: none"
+          >
+            <span>▶️</span> Resume
+          </button>
+          <button
+            class="action-btn btn-danger"
+            id="stop-btn"
+            style="display: none"
+          >
+            <span>⏹️</span> Stop
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Recording Options</h3>
+          <label class="setting-item">
+            <input type="checkbox" id="include-screen" checked />
+            <span>Record Screen</span>
+          </label>
+          <label class="setting-item">
+            <input type="checkbox" id="include-audio" checked />
+            <span>Record Microphone</span>
+          </label>
+          <label class="setting-item">
+            <input type="checkbox" id="include-system-audio" />
+            <span>Record System Audio</span>
+          </label>
+        </div>
+
+        <div class="recent-section">
+          <h3>Recent Recordings</h3>
+          <div id="recordings-list">
+            <div class="loading">
+              <div class="spinner"></div>
+              Loading recordings...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="footer-btn" id="open-dashboard">
+          📊 Open Full Dashboard
+        </button>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

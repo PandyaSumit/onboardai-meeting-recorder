@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Recorder - Media Handler</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #f3f4f6;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      .container {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+      }
+      .icon {
+        font-size: 48px;
+        margin-bottom: 20px;
+      }
+      h1 {
+        color: #1f2937;
+        margin-bottom: 10px;
+        font-size: 24px;
+        font-weight: 600;
+      }
+      p {
+        color: #6b7280;
+        margin-bottom: 20px;
+        line-height: 1.5;
+      }
+      .status {
+        background: #f3f4f6;
+        padding: 15px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 14px;
+        color: #374151;
+        border-left: 4px solid #3b82f6;
+      }
+      .status.recording {
+        background: #fef2f2;
+        border-left-color: #ef4444;
+        color: #991b1b;
+      }
+      .status.ready {
+        background: #f0fdf4;
+        border-left-color: #10b981;
+        color: #065f46;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">🎥</div>
+      <h1>Meeting Recorder Pro</h1>
+      <p>
+        This hidden document handles media capture for the Meeting Recorder
+        extension. It runs in the background to access your camera, microphone,
+        and screen sharing capabilities.
+      </p>
+      <div id="status" class="status">System Status: Ready</div>
+    </div>
+
+    <script>
+      class OffscreenMediaHandler {
+        constructor() {
+          this.mediaRecorder = null;
+          this.recordingChunks = [];
+          this.currentStream = null;
+          this.isPaused = false;
+          this.statusEl = document.getElementById("status");
+
+          this.setupMessageListener();
+          this.updateStatus("System initialized - Ready for recording");
+
+          console.log("OffscreenMediaHandler: Initialized");
+        }
+
+        setupMessageListener() {
+          chrome.runtime.onMessage.addListener(
+            (message, sender, sendResponse) => {
+              this.handleMessage(message, sender, sendResponse);
+              return true; // Keep message channel open for async response
+            }
+          );
+        }
+
+        async handleMessage(message, sender, sendResponse) {
+          const { target, action, options } = message;
+
+          if (target !== "offscreen") {
+            return;
+          }
+
+          try {
+            switch (action) {
+              case "START_CAPTURE":
+                console.log("OffscreenMediaHandler: Starting capture");
+                const startResult = await this.startCapture(options);
+                sendResponse(startResult);
+                break;
+
+              case "STOP_CAPTURE":
+                console.log("OffscreenMediaHandler: Stopping capture");
+                const stopResult = await this.stopCapture();
+                sendResponse(stopResult);
+                break;
+
+              case "PAUSE_CAPTURE":
+                console.log("OffscreenMediaHandler: Pausing capture");
+                const pauseResult = this.pauseCapture();
+                sendResponse(pauseResult);
+                break;
+
+              case "RESUME_CAPTURE":
+                console.log("OffscreenMediaHandler: Resuming capture");
+                const resumeResult = this.resumeCapture();
+                sendResponse(resumeResult);
+                break;
+
+              default:
+                console.warn("OffscreenMediaHandler: Unknown action:", action);
+                sendResponse({ success: false, error: "Unknown action" });
+            }
+          } catch (error) {
+            console.error(
+              "OffscreenMediaHandler: Error handling message:",
+              error
+            );
+            sendResponse({ success: false, error: error.message });
+          }
+        }
+
+        async startCapture(options = {}) {
+          try {
+            this.updateStatus("Requesting media permissions...", "recording");
+
+            // Clean up any existing streams
+            this.cleanup();
+
+            // Get media streams based on options
+            const streams = [];
+
+            if (options.includeScreen) {
+              const screenStream = await this.getScreenStream(options);
+              streams.push(screenStream);
+            }
+
+            if (options.includeAudio) {
+              const audioStream = await this.getAudioStream(options);
+              streams.push(audioStream);
+            }
+
+            if (streams.length === 0) {
+              throw new Error("No capture sources selected");
+            }
+
+            // Combine streams
+            this.currentStream = this.combineStreams(streams);
+
+            // Set up MediaRecorder
+            this.recordingChunks = [];
+            this.isPaused = false;
+
+            const mimeType = this.getSupportedMimeType();
+            const recordingOptions = {
+              mimeType,
+              videoBitsPerSecond: this.getVideoBitrate(options.videoQuality),
+              audioBitsPerSecond: this.getAudioBitrate(options.audioQuality),
+            };
+
+            this.mediaRecorder = new MediaRecorder(
+              this.currentStream,
+              recordingOptions
+            );
+
+            // Set up event handlers
+            this.mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                this.recordingChunks.push(event.data);
+                console.log(
+                  "OffscreenMediaHandler: Data chunk received:",
+                  event.data.size,
+                  "bytes"
+                );
+              }
+            };
+
+            this.mediaRecorder.onstop = () => {
+              console.log("OffscreenMediaHandler: Recording stopped");
+              this.processRecording();
+            };
+
+            this.mediaRecorder.onerror = (event) => {
+              console.error(
+                "OffscreenMediaHandler: MediaRecorder error:",
+                event.error
+              );
+              this.updateStatus(
+                `Recording error: ${event.error.message}`,
+                "error"
+              );
+              this.notifyError(event.error.message);
+            };
+
+            // Start recording
+            this.mediaRecorder.start(1000); // Collect data every second
+            this.updateStatus("Recording in progress...", "recording");
+
+            console.log(
+              "OffscreenMediaHandler: Recording started successfully"
+            );
+            return { success: true, mimeType };
+          } catch (error) {
+            console.error(
+              "OffscreenMediaHandler: Failed to start capture:",
+              error
+            );
+            this.updateStatus(`Capture failed: ${error.message}`, "error");
+            this.cleanup();
+            return { success: false, error: error.message };
+          }
+        }
+
+        async stopCapture() {
+          try {
+            if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
+              this.updateStatus("Stopping recording...", "ready");
+              this.mediaRecorder.stop();
+            } else {
+              this.processRecording();
+            }
+            return { success: true };
+          } catch (error) {
+            console.error(
+              "OffscreenMediaHandler: Failed to stop capture:",
+              error
+            );
+            return { success: false, error: error.message };
+          }
+        }
+
+        pauseCapture() {
+          try {
+            if (
+              this.mediaRecorder &&
+              this.mediaRecorder.state === "recording"
+            ) {
+              this.mediaRecorder.pause();
+              this.isPaused = true;
+              this.updateStatus("Recording paused", "ready");
+              return { success: true };
+            }
+            return { success: false, error: "No active recording to pause" };
+          } catch (error) {
+            console.error(
+              "OffscreenMediaHandler: Failed to pause capture:",
+              error
+            );
+            return { success: false, error: error.message };
+          }
+        }
+
+        resumeCapture() {
+          try {
+            if (this.mediaRecorder && this.mediaRecorder.state === "paused") {
+              this.mediaRecorder.resume();
+              this.isPaused = false;
+              this.updateStatus("Recording resumed", "recording");
+              return { success: true };
+            }
+            return { success: false, error: "No paused recording to resume" };
+          } catch (error) {
+            console.error(
+              "OffscreenMediaHandler: Failed to resume capture:",
+              error
+            );
+            return { success: false, error: error.message };
+          }
+        }
+
+        async getScreenStream(options) {
+          const constraints = {
+            video: {
+              mediaSource: "screen",
+              width: { ideal: 1920, max: 1920 },
+              height: { ideal: 1080, max: 1080 },
+              frameRate: { ideal: 30, max: 30 },
+            },
+            audio: options.includeSystemAudio || false,
+          };
+
+          return await navigator.mediaDevices.getDisplayMedia(constraints);
+        }
+
+        async getAudioStream(options) {
+          const constraints = {
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: { ideal: 48000 },
+              channelCount: { ideal: 2 },
+            },
+          };
+
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        }
+
+        combineStreams(streams) {
+          const tracks = [];
+
+          streams.forEach((stream) => {
+            stream.getTracks().forEach((track) => {
+              tracks.push(track);
+            });
+          });
+
+          console.log("OffscreenMediaHandler: Combined tracks:", tracks.length);
+          return new MediaStream(tracks);
+        }
+
+        getSupportedMimeType() {
+          const types = [
+            "video/webm;codecs=vp9,opus",
+            "video/webm;codecs=vp8,opus",
+            "video/webm;codecs=h264,opus",
+            "video/webm",
+            "video/mp4",
+          ];
+
+          const supportedType = types.find((type) =>
+            MediaRecorder.isTypeSupported(type)
+          );
+          console.log("OffscreenMediaHandler: Using MIME type:", supportedType);
+          return supportedType || "video/webm";
+        }
+
+        getVideoBitrate(quality) {
+          const bitrates = {
+            low: 500000, // 500kbps
+            medium: 1500000, // 1.5Mbps
+            high: 3000000, // 3Mbps
+          };
+          return bitrates[quality] || bitrates.medium;
+        }
+
+        getAudioBitrate(quality) {
+          const bitrates = {
+            low: 64000, // 64kbps
+            medium: 128000, // 128kbps
+            high: 256000, // 256kbps
+          };
+          return bitrates[quality] || bitrates.medium;
+        }
+
+        async processRecording() {
+          try {
+            if (this.recordingChunks.length === 0) {
+              throw new Error("No recording data available");
+            }
+
+            this.updateStatus("Processing recording...", "ready");
+
+            // Create blob from chunks
+            const recordingBlob = new Blob(this.recordingChunks, {
+              type: this.mediaRecorder.mimeType,
+            });
+
+            console.log(
+              "OffscreenMediaHandler: Recording blob created:",
+              recordingBlob.size,
+              "bytes"
+            );
+
+            // Convert to base64 for message passing
+            const base64Data = await this.blobToBase64(recordingBlob);
+
+            // Send to background script
+            chrome.runtime.sendMessage({
+              action: "RECORDING_COMPLETE",
+              data: {
+                blob: base64Data,
+                mimeType: this.mediaRecorder.mimeType,
+                size: recordingBlob.size,
+              },
+            });
+
+            this.updateStatus("Recording processed successfully", "ready");
+            this.cleanup();
+          } catch (error) {
+            console.error(
+              "OffscreenMediaHandler: Error processing recording:",
+              error
+            );
+            this.updateStatus(`Processing failed: ${error.message}`, "error");
+            this.notifyError(`Failed to process recording: ${error.message}`);
+          }
+        }
+
+        blobToBase64(blob) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        notifyError(message) {
+          chrome.runtime.sendMessage({
+            action: "RECORDING_ERROR",
+            error: message,
+          });
+        }
+
+        updateStatus(message, type = "ready") {
+          if (this.statusEl) {
+            this.statusEl.textContent = `Status: ${message}`;
+            this.statusEl.className = `status ${type}`;
+          }
+          console.log(`OffscreenMediaHandler: Status - ${message}`);
+        }
+
+        cleanup() {
+          // Stop all tracks
+          if (this.currentStream) {
+            this.currentStream.getTracks().forEach((track) => {
+              track.stop();
+              console.log("OffscreenMediaHandler: Track stopped:", track.kind);
+            });
+            this.currentStream = null;
+          }
+
+          // Reset recorder
+          this.mediaRecorder = null;
+          this.recordingChunks = [];
+          this.isPaused = false;
+
+          console.log("OffscreenMediaHandler: Cleanup completed");
+        }
+      }
+
+      // Initialize when DOM is ready
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => {
+          new OffscreenMediaHandler();
+        });
+      } else {
+        new OffscreenMediaHandler();
+      }
+    </script>
+  </body>
+</html>
